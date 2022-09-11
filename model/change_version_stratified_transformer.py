@@ -10,7 +10,7 @@ from lib.pointops2.functions import pointops
 def get_indice_pairs(p2v_map, counts, new_p2v_map, new_counts, downsample_idx, batch, xyz, window_size, i):
     # p2v_map: [n, k]
     # counts: [n, ]
-    
+
     n, k = p2v_map.shape
     mask = torch.arange(k).unsqueeze(0).cuda() < counts.unsqueeze(-1) #[n, k]
     mask_mat = (mask.unsqueeze(-1) & mask.unsqueeze(-2)) #[n, k, k]
@@ -19,7 +19,7 @@ def get_indice_pairs(p2v_map, counts, new_p2v_map, new_counts, downsample_idx, b
 
     downsample_mask = torch.zeros_like(batch).bool() #[N, ]
     downsample_mask[downsample_idx.long()] = True
-    
+
     downsample_mask = downsample_mask[new_p2v_map] #[n, k]
     n, k = new_p2v_map.shape
     mask = torch.arange(k).unsqueeze(0).cuda() < new_counts.unsqueeze(-1) #[n, k]
@@ -110,7 +110,7 @@ class TransitionDown(nn.Module):
         m, k, c = feats.shape
         feats = self.linear(self.norm(feats.view(m*k, c)).view(m, k, c)).transpose(1, 2).contiguous()
         feats = self.pool(feats).squeeze(-1)  # (m, c)
-        
+
         return feats, n_xyz, n_offset
 
 
@@ -176,9 +176,9 @@ class WindowAttention(nn.Module):
 
         N, C = feats.shape
         M = index_0.shape[0]
- 
+
         assert index_0.shape[0] == index_1.shape[0]
-        
+
         # Query, Key, Value
         qkv = self.qkv(feats).reshape(N, 3, self.num_heads, C // self.num_heads).permute(1, 0, 2, 3).contiguous()
         query, key, value = qkv[0], qkv[1], qkv[2] #[N, num_heads, C//num_heads]
@@ -204,14 +204,14 @@ class WindowAttention(nn.Module):
 
 
         attn_flat = attn_flat + relative_position_bias #[M, num_heads]
-        
+
         softmax_attn_flat = scatter_softmax(src=attn_flat, index=index_0, dim=0) #[M, num_heads]
 
         if self.rel_value:
             x = pointops.attention_step2_with_rel_pos_value_v2(softmax_attn_flat.float(), value.float(), index_0_offsets.int(), n_max, index_1.int(), self.relative_pos_value_table.float(), relative_position_index.int())
         else:
             x = pointops.attention_step2(softmax_attn_flat.float(), value.float(), index_0.int(), index_1.int())
-                
+
         x = x.view(N, C)
 
         x = self.proj(x)
@@ -220,15 +220,15 @@ class WindowAttention(nn.Module):
         return x
 
 class SwinTransformerBlock(nn.Module):
-    def __init__(self, dim, num_heads, window_size, quant_size, 
-            rel_query=True, rel_key=False, rel_value=False, drop_path=0.0,\
-            mlp_ratio=4.0, qkv_bias=True, qk_scale=None, act_layer=nn.GELU, norm_layer=nn.LayerNorm, mode=4): # mode=4:mean
+    def __init__(self, dim, num_heads, window_size, quant_size,
+                 rel_query=True, rel_key=False, rel_value=False, drop_path=0.0, \
+                 mlp_ratio=4.0, qkv_bias=True, qk_scale=None, act_layer=nn.GELU, norm_layer=nn.LayerNorm, mode=4): # mode=4:mean
         super().__init__()
         self.mode = mode
 
         self.norm1 = norm_layer(dim)
-        self.attn = WindowAttention(dim, window_size, num_heads=num_heads, quant_size=quant_size, 
-            rel_query=rel_query, rel_key=rel_key, rel_value=rel_value, qkv_bias=qkv_bias, qk_scale=qk_scale)
+        self.attn = WindowAttention(dim, window_size, num_heads=num_heads, quant_size=quant_size,
+                                    rel_query=rel_query, rel_key=rel_key, rel_value=rel_value, qkv_bias=qkv_bias, qk_scale=qk_scale)
 
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
         self.norm2 = norm_layer(dim)
@@ -243,20 +243,20 @@ class SwinTransformerBlock(nn.Module):
         # 这里可以改进，运用加减，对重点特征做权重关注，feats-short_cuts,然后做线性变化得到权重，然后乘feats+short_cuts
         #**********
         short_cut = feats
-        
+
         feats = self.norm1(feats)
-        
+
         feats = self.attn(feats, xyz, index_0, index_1, index_0_offsets, n_max) # index_0 MUST be in ascending order
-        
+
         feats = short_cut + self.drop_path(feats)
         feats = feats + self.drop_path(self.mlp(self.norm2(feats)))
 
         return feats
 
 class BasicLayer(nn.Module):
-    def __init__(self, downsample_scale, depth, channel, num_heads, window_size, grid_size, quant_size, 
-            rel_query=True, rel_key=False, rel_value=False, drop_path=0.0, mlp_ratio=4.0, qkv_bias=True, \
-            qk_scale=None, norm_layer=nn.LayerNorm, downsample=None, ratio=0.25, k=16, out_channels=None):
+    def __init__(self, downsample_scale, depth, channel, num_heads, window_size, grid_size, quant_size,
+                 rel_query=True, rel_key=False, rel_value=False, drop_path=0.0, mlp_ratio=4.0, qkv_bias=True, \
+                 qk_scale=None, norm_layer=nn.LayerNorm, downsample=None, ratio=0.25, k=16, out_channels=None):
         super().__init__()
         self.depth = depth # block的层数
         self.grid_size = grid_size
@@ -265,18 +265,18 @@ class BasicLayer(nn.Module):
         self.downsample_scale = downsample_scale # 下采样的程度
 
         # tranformer block to be stacked here
-        self.blocks = nn.ModuleList([SwinTransformerBlock(channel, num_heads, window_size, quant_size, 
-            rel_query=rel_query, rel_key=rel_key, rel_value=rel_value, drop_path=drop_path[i] if isinstance(drop_path, list) else drop_path,\
-            mlp_ratio=mlp_ratio, qkv_bias=qkv_bias, qk_scale=qk_scale, norm_layer=norm_layer) for i in range(depth)])
+        self.blocks = nn.ModuleList([SwinTransformerBlock(channel, num_heads, window_size, quant_size,
+                                                          rel_query=rel_query, rel_key=rel_key, rel_value=rel_value, drop_path=drop_path[i] if isinstance(drop_path, list) else drop_path, \
+                                                          mlp_ratio=mlp_ratio, qkv_bias=qkv_bias, qk_scale=qk_scale, norm_layer=norm_layer) for i in range(depth)])
 
         self.downsample = downsample(channel, out_channels, ratio, k) if downsample else None
 
     def forward(self, feats, xyz, offset):
         # feats: N, C
         # xyz: N, 3
-        
+
         window_size = torch.tensor([self.window_size]*3).type_as(xyz).to(xyz.device)
-        
+
         offset_ = offset.clone()
         offset_[1:] = offset_[1:] - offset_[:-1]
         batch = torch.cat([torch.tensor([ii]*o) for ii,o in enumerate(offset_)], 0).long().cuda()
@@ -285,18 +285,18 @@ class BasicLayer(nn.Module):
 
         shift_size = 1/2*window_size
         shift_v2p_map, shift_p2v_map, shift_counts = grid_sample(xyz+shift_size, batch, window_size, start=xyz.min(0)[0])
-        
+
         downsample_scale = self.downsample_scale
         new_offset, count = [offset[0].item() // downsample_scale + 1], offset[0].item() // downsample_scale + 1
         for i in range(1, offset.shape[0]):
             count += (offset[i].item() - offset[i-1].item()) // downsample_scale + 1
             new_offset.append(count)
-            
+
         new_offset = torch.cuda.IntTensor(new_offset)
         downsample_idx = pointops.furthestsampling(xyz, offset.int(), new_offset.int()) #[N/16,]
 
         new_window_size = 2 * torch.tensor([self.window_size]*3).type_as(xyz).to(xyz.device)
-        
+
         # offset_ = new_offset.clone()
         # offset_[1:] = offset_[1:] - offset_[:-1]
         # new_batch = torch.cat([torch.tensor([ii]*o) for ii,o in enumerate(offset_)], 0).long().cuda()
@@ -305,7 +305,7 @@ class BasicLayer(nn.Module):
 
         shift_size = 1/2*new_window_size
         shift_new_v2p_map, shift_new_p2v_map, shift_new_counts = grid_sample(xyz+shift_size, batch, new_window_size, start=xyz.min(0)[0])
-        
+
         for i, blk in enumerate(self.blocks):
             p2v_map_blk = p2v_map if i % 2 == 0 else shift_p2v_map
             counts_blk = counts if i % 2 == 0 else shift_counts
@@ -327,12 +327,12 @@ class BasicLayer(nn.Module):
             # 在swintransformerblock改，和downsample改
             #************************
             feats = blk(feats, xyz, index_0, index_1, index_0_offsets, n_max)
-            
+
         if self.downsample:
             feats_down, xyz_down, offset_down = self.downsample(feats, xyz, offset)
         else:
             feats_down, xyz_down, offset_down = None, None, None
-            
+
         return feats, xyz, offset, feats_down, xyz_down, offset_down
 
 
@@ -363,7 +363,7 @@ class KPConvSimpleBlock(nn.Module):
         # xyz: [N, 3]
         # batch: [N,]
         # neighbor_idx: [N, M]
-        
+
         feats = self.kpconv(xyz, xyz, neighbor_idx, feats)
         feats = self.activation(self.bn(feats))
         return feats
@@ -392,7 +392,7 @@ class KPConvResBlock(nn.Module):
         # xyz: [N, 3]
         # batch: [N,]
         # neighbor_idx: [N, M]
-        
+
         shortcut = feats
         feats = self.unary_1(feats)
         feats = self.kpconv(xyz, xyz, neighbor_idx, feats)
@@ -403,10 +403,10 @@ class KPConvResBlock(nn.Module):
 
 class Stratified(nn.Module):
     def __init__(self, downsample_scale, depths, channels, num_heads, window_size, up_k, \
-            grid_sizes, quant_sizes, rel_query=True, rel_key=False, rel_value=False, drop_path_rate=0.2, \
-            num_layers=4, concat_xyz=False, num_classes=13, ratio=0.25, k=16, prev_grid_size=0.04, sigma=1.0, stem_transformer=False):
+                 grid_sizes, quant_sizes, rel_query=True, rel_key=False, rel_value=False, drop_path_rate=0.2, \
+                 num_layers=4, concat_xyz=False, num_classes=13, ratio=0.25, k=16, prev_grid_size=0.04, sigma=1.0, stem_transformer=False):
         super().__init__()
-        
+
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths))]  # stochastic depth decay rule
 
         if stem_transformer:
@@ -423,16 +423,16 @@ class Stratified(nn.Module):
             self.layer_start = 1
 
         self.layers = nn.ModuleList([BasicLayer(downsample_scale, depths[i], channels[i], num_heads[i], window_size[i], grid_sizes[i], \
-            quant_sizes[i], rel_query=rel_query, rel_key=rel_key, rel_value=rel_value, \
-            drop_path=dpr[sum(depths[:i]):sum(depths[:i+1])], downsample=TransitionDown if i < num_layers-1 else None, \
-            ratio=ratio, k=k, out_channels=channels[i+1] if i < num_layers-1 else None) for i in range(self.layer_start, num_layers)])
+                                                quant_sizes[i], rel_query=rel_query, rel_key=rel_key, rel_value=rel_value, \
+                                                drop_path=dpr[sum(depths[:i]):sum(depths[:i+1])], downsample=TransitionDown if i < num_layers-1 else None, \
+                                                ratio=ratio, k=k, out_channels=channels[i+1] if i < num_layers-1 else None) for i in range(self.layer_start, num_layers)])
 
         self.upsamples = nn.ModuleList([Upsample(up_k, channels[i], channels[i-1]) for i in range(num_layers-1, 0, -1)])
-        
+
         self.classifier = nn.Sequential(
-            nn.Linear(channels[0], channels[0]), 
-            nn.BatchNorm1d(channels[0]), 
-            nn.ReLU(inplace=True), 
+            nn.Linear(channels[0], channels[0]),
+            nn.BatchNorm1d(channels[0]),
+            nn.ReLU(inplace=True),
             nn.Linear(channels[0], num_classes)
         )
 
@@ -456,7 +456,7 @@ class Stratified(nn.Module):
 
         # 返回内存连续的张量
         feats = feats.contiguous()
-        
+
         if self.layer_start == 1:
             feats_stack.append(feats)
             xyz_stack.append(xyz)
@@ -485,7 +485,7 @@ class Stratified(nn.Module):
 
         out = self.classifier(feats)
 
-        return out        
+        return out
 
     def init_weights(self):
         """Initialize the weights in backbone.
