@@ -52,7 +52,7 @@ TRAIN:
   batch_size: 5  # batch size for training
   batch_size_val: 1  # batch size for validation during training, memory and speed tradeoff
   base_lr: 0.006
-  epochs: 100
+  epochs: 20
   start_epoch: 0
   step_epoch: 30
   multiplier: 0.1
@@ -62,9 +62,9 @@ TRAIN:
   manual_seed: 123
   print_freq: 1
   save_freq: 1
-  save_path: runs/train_test_5
+  save_path: runs/train_5
   weight:  # path to initial weight (default: none)
-  resume:  # path to latest checkpoint (default: none)
+  resume: # path to latest checkpoint (default: none)
   evaluate: True  # evaluate on validation set, extra gpu memory needed and small batch_size_val is recommend
   eval_freq: 1
 Distributed:
@@ -80,7 +80,7 @@ TEST:
   split: val  # split in [train, val and test]
   test_gpu: [0]
   test_workers: 4
-  batch_size_test: 4
-  model_path: # Fill the path of the trained .pth file model
-  save_folder: # Fill the path to store the .npy files for each scene
+  batch_size_test: 1
+  model_path: runs/train_test_5/model/model_best.pth # Fill the path of the trained .pth file model
+  save_folder: train_test_5_npy # Fill the path to store the .npy files for each scene
   names_path: data/s3dis/s3dis_names.txt

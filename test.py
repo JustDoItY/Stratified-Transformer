@@ -93,7 +93,8 @@ def main():
     #model = torch.nn.DataParallel(model.cuda())
     logger.info(model)
     criterion = nn.CrossEntropyLoss(ignore_index=args.ignore_label).cuda()
-    names = [line.rstrip('\n') for line in open(args.names_path)]
+    # names = [line.rstrip('\n') for line in open(args.names_path)]
+    names = ''
     if os.path.isfile(args.model_path):
         logger.info("=> loading checkpoint '{}'".format(args.model_path))
         checkpoint = torch.load(args.model_path)
@@ -202,7 +203,7 @@ def test(model, criterion, names, test_transform_set):
     intersection_meter = AverageMeter()
     union_meter = AverageMeter()
     target_meter = AverageMeter()
-    args.batch_size_test = 5 
+    # args.batch_size_test = 5
     # args.voxel_max = None
     model.eval()
 
@@ -329,7 +330,9 @@ def test(model, criterion, names, test_transform_set):
     logger.info('Val1 result: mIoU/mAcc/allAcc {:.4f}/{:.4f}/{:.4f}.'.format(mIoU1, mAcc1, allAcc1))
 
     for i in range(args.classes):
-        logger.info('Class_{} Result: iou/accuracy {:.4f}/{:.4f}, name: {}.'.format(i, iou_class[i], accuracy_class[i], names[i]))
+        # logger.info('Class_{} Result: iou/accuracy {:.4f}/{:.4f}, name: {}.'.format(i, iou_class[i], accuracy_class[i], names[i]))
+        logger.info('Class_{} Result: iou/accuracy {:.4f}/{:.4f}, name: {}.'.format(i, iou_class[i], accuracy_class[i]))
+
     logger.info('<<<<<<<<<<<<<<<<< End Evaluation <<<<<<<<<<<<<<<<<')
 
 
